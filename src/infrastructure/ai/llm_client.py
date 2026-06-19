@@ -98,6 +98,55 @@ class LLMClient:
         ]
 
 
+    def decompose_query(self, query: str) -> List[str]:
+        """
+        Decomposes a complex user query into sub-queries or key search terms.
+        Uses OpenAI/Gemini if active, otherwise falls back to simple word extraction.
+        """
+        prompt = (
+            "Decompose the following complex user query into a list of simpler, distinct sub-queries "
+            "or key concepts to perform a vector search. Respond strictly with a JSON object containing "
+            "a single list key 'sub_queries'. Each item must be a short string query.\n\n"
+            f"Query: {query}\n\n"
+            "Example response format: {\"sub_queries\": [\"What is Brainy 1.0\", \"Who published the video\"]}"
+        )
+
+        # 1. Try OpenAI if keys are active
+        if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "mock-key":
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=settings.OPENAI_API_KEY)
+                res = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"}
+                )
+                data = json.loads(res.choices[0].message.content)
+                if "sub_queries" in data and isinstance(data["sub_queries"], list):
+                    return [q.strip() for q in data["sub_queries"] if q.strip()]
+            except Exception as e:
+                print(f"OpenAI Query Decomposition failed: {e}. Trying local fallback...")
+
+        # 2. Try Local Ollama fallback
+        try:
+            url = f"{self.ollama_url}/api/generate"
+            payload = {
+                "model": "llama3.1:8b",
+                "prompt": prompt,
+                "stream": False,
+                "format": "json"
+            }
+            response = requests.post(url, json=payload, timeout=20)
+            response.raise_for_status()
+            data = json.loads(response.json().get("response", "{}"))
+            if "sub_queries" in data and isinstance(data["sub_queries"], list):
+                return [q.strip() for q in data["sub_queries"] if q.strip()]
+        except Exception as e:
+            print(f"Local Ollama Query Decomposition failed: {e}. Using simple fallback...")
+
+        # 3. Simple fallback (just return the original query)
+        return [query]
+
     def generate_reasoning_answer(self, query: str, context: str) -> str:
         """
         Synthesize a response to the user query based on the retrieved context.

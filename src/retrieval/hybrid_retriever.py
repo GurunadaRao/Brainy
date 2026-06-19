@@ -8,15 +8,28 @@ class HybridRetriever:
     async def retrieve(self, query: str, top_k: int = 5) -> Dict[str, Any]:
         """
         Orchestrates hybrid retrieval:
-        1. Generates text embedding for the search query via local Ollama.
-        2. Queries Qdrant to find the top-K similar transcript chunks.
-        3. Queries Neo4j using chunk IDs to retrieve related entities and triplets.
+        1. Decomposes query into sub-queries using LLM.
+        2. Generates text embeddings and queries Qdrant for similar chunks, deduplicating them.
+        3. Queries Neo4j using chunk IDs to retrieve 1-hop and 2-hop related entities and triplets.
         """
-        # 1. Generate query embedding
-        query_embedding = llm_client.get_embedding(query)
+        # 1. Decompose query
+        sub_queries = llm_client.decompose_query(query)
+        
+        # 2. Vector search in Qdrant for each sub-query
+        vector_results_map = {}
+        for sq in sub_queries:
+            sq_embedding = llm_client.get_embedding(sq)
+            sq_results = vector_client.search_chunks(sq_embedding, top_k=top_k)
+            for res in sq_results:
+                vector_results_map[res["chunk_id"]] = res
 
-        # 2. Vector search in Qdrant
-        vector_results = vector_client.search_chunks(query_embedding, top_k=top_k)
+        # Sort combined results by score and slice to top_k
+        vector_results = sorted(
+            vector_results_map.values(),
+            key=lambda x: x["score"],
+            reverse=True
+        )[:top_k]
+
         if not vector_results:
             return {
                 "chunks": [],
@@ -27,12 +40,17 @@ class HybridRetriever:
         # 3. Extract matching chunk IDs
         chunk_ids = [res["chunk_id"] for res in vector_results]
 
-        # 4. Walk the Knowledge Graph in Neo4j to find associated entities and facts
+        # 4. Walk the Knowledge Graph in Neo4j up to 2-hops to find associated entities and facts
         cypher = """
         MATCH (c:Chunk)-[:MENTIONS]->(e:Entity)
         WHERE c.id IN $chunk_ids
-        OPTIONAL MATCH (e)-[r]->(other:Entity)
+        OPTIONAL MATCH (e)-[r:!MENTIONS]->(other:Entity)
         RETURN c.id as chunk_id, e.name as subject, type(r) as predicate, other.name as object
+        UNION
+        MATCH (c:Chunk)-[:MENTIONS]->(e:Entity)
+        WHERE c.id IN $chunk_ids
+        MATCH (e)-[r1:!MENTIONS]->(other1:Entity)-[r2:!MENTIONS]->(other2:Entity)
+        RETURN c.id as chunk_id, other1.name as subject, type(r2) as predicate, other2.name as object
         """
         
         graph_results = await graph_client.run_query(cypher, {"chunk_ids": chunk_ids})
