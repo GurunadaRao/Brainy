@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brainy 1.0 - Video Intelligence & GraphRAG</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-base: #080710;
+            --bg-surface: rgba(255, 255, 255, 0.03);
+            --border-glow: rgba(255, 255, 255, 0.08);
+            --accent-purple: #8b5cf6;
+            --accent-purple-glow: rgba(139, 92, 246, 0.25);
+            --accent-cyan: #06b6d4;
+            --accent-cyan-glow: rgba(6, 182, 212, 0.25);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 40%);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border-glow);
+            backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(8, 7, 16, 0.7);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 2.2rem;
+            height: 2.2rem;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 0 15px var(--accent-purple-glow);
+        }
+
+        .logo-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #ffffff, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-version {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 20px;
+            color: #d8b4fe;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glow);
+            padding: 0.4rem 0.8rem;
+            border-radius: 30px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+            box-shadow: 0 0 8px var(--text-muted);
+        }
+
+        .status-dot.healthy {
+            background-color: var(--success);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+        }
+
+        .status-dot.degraded {
+            background-color: var(--warning);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+            height: calc(100vh - 80px);
+        }
+
+        .panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-glow);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-left {
+            flex: 1.2;
+            max-width: 500px;
+        }
+
+        .panel-right {
+            flex: 2;
+        }
+
+        .panel-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-glow);
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .panel-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Ingest Input Form */
+        .ingest-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glow);
+            padding: 0.85rem 1.25rem;
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 12px var(--accent-purple-glow);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            color: white;
+            border: none;
+            padding: 0.85rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Video List styles */
+        .video-list-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 250px;
+        }
+
+        .video-list-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .video-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 0.25rem;
+        }
+
+        .video-list::-webkit-scrollbar, .panel-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .video-list::-webkit-scrollbar-thumb, .panel-body::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .video-card {
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid var(--border-glow);
+            padding: 1rem;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .video-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        .video-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .video-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .video-id {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .video-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Status Badges */
+        .badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-queued {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .badge-downloading {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--warning);
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        .badge-transcribing {
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #d8b4fe;
+            animation: pulse-glow-purple 1.5s infinite;
+        }
+
+        .badge-completed {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success);
+        }
+
+        .badge-failed {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+
+        @keyframes pulse-glow {
+            0% { opacity: 0.8; box-shadow: 0 0 5px rgba(245, 158, 11, 0.1); }
+            50% { opacity: 1; box-shadow: 0 0 12px rgba(245, 158, 11, 0.35); }
+            100% { opacity: 0.8; box-shadow: 0 0 5px rgba(245, 158, 11, 0.1); }
+        }
+
+        @keyframes pulse-glow-purple {
+            0% { opacity: 0.8; box-shadow: 0 0 5px rgba(139, 92, 246, 0.1); }
+            50% { opacity: 1; box-shadow: 0 0 12px rgba(139, 92, 246, 0.35); }
+            100% { opacity: 0.8; box-shadow: 0 0 5px rgba(139, 92, 246, 0.1); }
+        }
+
+        /* Right Panel: Chat Flow */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .chat-history::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-history::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .chat-message {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-width: 85%;
+        }
+
+        .chat-message.user {
+            align-self: flex-end;
+        }
+
+        .chat-message.assistant {
+            align-self: flex-start;
+            max-width: 95%;
+        }
+
+        .chat-bubble {
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .chat-message.user .chat-bubble {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.2));
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-bottom-right-radius: 2px;
+            color: var(--text-primary);
+        }
+
+        .chat-message.assistant .chat-bubble {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glow);
+            border-top-left-radius: 2px;
+            color: #f1f5f9;
+        }
+
+        /* Citations & Triplets */
+        .sources-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .sources-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .source-pill-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .source-card {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid var(--border-glow);
+            padding: 0.6rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .source-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .source-card-title {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
+        }
+
+        .source-card-time {
+            color: var(--accent-cyan);
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+
+        .source-card-content {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .triplets-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            border-top: 1px dashed rgba(255, 255, 255, 0.05);
+            padding-top: 0.75rem;
+        }
+
+        .triplets-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #a78bfa;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .triplet-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .triplet-pill {
+            background: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.25);
+            border-radius: 6px;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .triplet-s { color: #f8fafc; font-weight: 600; }
+        .triplet-p { color: #d8b4fe; font-style: italic; }
+        .triplet-o { color: #38bdf8; font-weight: 600; }
+
+        /* Chat Input */
+        .chat-input-container {
+            padding: 1.25rem 1.5rem;
+            border-top: 1px solid var(--border-glow);
+            background: rgba(255, 255, 255, 0.01);
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .chat-input-container input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-glow);
+            padding: 0.85rem 1.25rem;
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: inherit;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .chat-input-container input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 12px var(--accent-cyan-glow);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .empty-chat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            text-align: center;
+            color: var(--text-muted);
+            gap: 1rem;
+            padding: 2rem;
+        }
+
+        .empty-chat-icon {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+            padding: 0.4rem 0.5rem;
+        }
+
+        .loading-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">B</div>
+            <div class="logo-text">Brainy <span class="logo-version">1.0</span></div>
+        </div>
+        <div class="status-badge" id="system-status">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Checking System Status...</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Left Panel - Ingest -->
+        <div class="panel panel-left">
+            <div class="panel-header">
+                <span>Video Pipeline</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);" id="video-count">0 Ingested</span>
+            </div>
+            <div class="panel-body">
+                <div class="ingest-form">
+                    <div class="input-group">
+                        <input type="text" id="youtube-url" placeholder="Paste YouTube Video URL (e.g. https://youtube.com/watch?v=...)">
+                    </div>
+                    <button class="btn" id="btn-ingest" onclick="triggerIngest()">
+                        <span>Queue Ingestion</span>
+                    </button>
+                </div>
+                
+                <div class="video-list-container">
+                    <div class="video-list-title">Ingested Repository</div>
+                    <div class="video-list" id="video-list-element">
+                        <div class="empty-chat" style="padding: 1rem;">
+                            <span style="font-size: 0.8rem;">No videos registered yet. Submit a URL to begin.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - GraphRAG Chat -->
+        <div class="panel panel-right">
+            <div class="panel-header">
+                <span>Cognitive GraphRAG Agent</span>
+            </div>
+            <div class="chat-container">
+                <div class="chat-history" id="chat-history-element">
+                    <div class="empty-chat" id="empty-chat-placeholder">
+                        <div class="empty-chat-icon">🧠</div>
+                        <h3>Welcome to Brainy 1.0</h3>
+                        <p style="font-size: 0.9rem; max-width: 400px; line-height: 1.4;">Ask questions about your ingested videos. The system retrieves semantic chunks from Qdrant and relational facts from Neo4j to generate reasoning answers.</p>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Query the Video Knowledge Graph..." onkeypress="handleKeyPress(event)">
+                    <button class="btn" onclick="sendChat()" id="btn-send">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "/api/v1";
+
+        // Query system status and list videos on load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkSystemStatus();
+            refreshVideosList();
+            
+            // Poll for system updates
+            setInterval(checkSystemStatus, 8000);
+            setInterval(refreshVideosList, 4000);
+        });
+
+        async function checkSystemStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/health`);
+                const data = await res.json();
+                const dotElement = document.getElementById('status-dot');
+                const textElement = document.getElementById('status-text');
+
+                if (data.status === 'healthy') {
+                    dotElement.className = 'status-dot healthy';
+                    textElement.innerText = 'System: Online';
+                } else {
+                    dotElement.className = 'status-dot degraded';
+                    textElement.innerText = 'System: Degraded';
+                }
+            } catch (error) {
+                const dotElement = document.getElementById('status-dot');
+                const textElement = document.getElementById('status-text');
+                dotElement.className = 'status-dot';
+                dotElement.style.backgroundColor = 'var(--danger)';
+                dotElement.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.6)';
+                textElement.innerText = 'System: Connection Error';
+            }
+        }
+
+        async function refreshVideosList() {
+            try {
+                const res = await fetch(`${API_BASE}/videos`);
+                const videos = await res.json();
+                
+                const listElement = document.getElementById('video-list-element');
+                const countElement = document.getElementById('video-count');
+                
+                countElement.innerText = `${videos.length} Ingested`;
+                
+                if (videos.length === 0) {
+                    listElement.innerHTML = `
+                        <div class="empty-chat" style="padding: 1rem;">
+                            <span style="font-size: 0.8rem;">No videos registered yet. Submit a URL to begin.</span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                listElement.innerHTML = videos.map(video => {
+                    const title = video.title || 'Processing Metadata...';
+                    const durationStr = video.duration ? `${Math.floor(video.duration / 60)}m ${video.duration % 60}s` : 'Unknown Duration';
+                    
+                    let badgeClass = 'badge-queued';
+                    if (video.status === 'downloading') badgeClass = 'badge-downloading';
+                    if (video.status === 'transcribing') badgeClass = 'badge-transcribing';
+                    if (video.status === 'completed') badgeClass = 'badge-completed';
+                    if (video.status === 'failed') badgeClass = 'badge-failed';
+                    
+                    return `
+                        <div class="video-card">
+                            <div class="video-card-top">
+                                <span class="video-title">${title}</span>
+                                <span class="badge ${badgeClass}">${video.status}</span>
+                            </div>
+                            <div class="video-meta">
+                                <span class="video-id">ID: ${video.id}</span>
+                                <span>${durationStr}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error("Failed to fetch videos:", error);
+            }
+        }
+
+        async function triggerIngest() {
+            const urlInput = document.getElementById('youtube-url');
+            const url = urlInput.value.trim();
+            if (!url) return;
+
+            const btn = document.getElementById('btn-ingest');
+            btn.disabled = true;
+            btn.innerHTML = '<span>Queuing...</span>';
+
+            try {
+                const res = await fetch(`${API_BASE}/ingest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    alert(`Failed to queue ingestion: ${error.detail || 'Unknown error'}`);
+                } else {
+                    urlInput.value = '';
+                    refreshVideosList();
+                }
+            } catch (err) {
+                alert(`Network error: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>Queue Ingestion</span>';
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendChat();
+            }
+        }
+
+        async function sendChat() {
+            const inputElement = document.getElementById('chat-input');
+            const query = inputElement.value.trim();
+            if (!query) return;
+
+            inputElement.value = '';
+            
+            // Remove empty placeholder if first message
+            const placeholder = document.getElementById('empty-chat-placeholder');
+            if (placeholder) {
+                placeholder.remove();
+            }
+
+            const chatHistory = document.getElementById('chat-history-element');
+            
+            // Render user bubble
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-message user';
+            userMsg.innerHTML = `<div class="chat-bubble">${escapeHtml(query)}</div>`;
+            chatHistory.appendChild(userMsg);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            // Render loading bubble
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'chat-message assistant';
+            loadingMsg.innerHTML = `
+                <div class="chat-bubble">
+                    <div class="loading-dots">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
+                </div>
+            `;
+            chatHistory.appendChild(loadingMsg);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            try {
+                const res = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                loadingMsg.remove();
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    renderAssistantResponse(chatHistory, `Error: ${error.detail || 'Failed to get answer'}`);
+                } else {
+                    const data = await res.json();
+                    renderAssistantResponse(chatHistory, data);
+                }
+            } catch (err) {
+                loadingMsg.remove();
+                renderAssistantResponse(chatHistory, `Network Error: ${err.message}`);
+            }
+        }
+
+        function renderAssistantResponse(chatHistory, data) {
+            const botMsg = document.createElement('div');
+            botMsg.className = 'chat-message assistant';
+
+            if (typeof data === 'string') {
+                botMsg.innerHTML = `<div class="chat-bubble" style="color: var(--danger);">${escapeHtml(data)}</div>`;
+            } else {
+                let sourcesHtml = '';
+                if (data.sources && data.sources.length > 0) {
+                    const sourceCards = data.sources.map(src => `
+                        <div class="source-card">
+                            <div class="source-card-header">
+                                <span class="source-card-title">${escapeHtml(src.video_title || 'Video')}</span>
+                                <span class="source-card-time">${src.start_time} - ${src.end_time}</span>
+                            </div>
+                            <div class="source-card-content">"${escapeHtml(src.content)}"</div>
+                        </div>
+                    `).join('');
+
+                    sourcesHtml = `
+                        <div class="sources-section">
+                            <div class="sources-title">Retrieved Sources</div>
+                            <div class="source-pill-grid">${sourceCards}</div>
+                        </div>
+                    `;
+                }
+
+                let tripletsHtml = '';
+                if (data.graph_facts && data.graph_facts.length > 0) {
+                    const tripletPills = data.graph_facts.map(fact => `
+                        <div class="triplet-pill">
+                            <span class="triplet-s">${escapeHtml(fact.subject)}</span>
+                            <span class="triplet-p">${escapeHtml(fact.predicate)}</span>
+                            <span class="triplet-o">${escapeHtml(fact.object)}</span>
+                        </div>
+                    `).join('');
+
+                    tripletsHtml = `
+                        <div class="triplets-section">
+                            <div class="triplets-title">Retrieved Graph Facts</div>
+                            <div class="triplet-grid">${tripletPills}</div>
+                        </div>
+                    `;
+                }
+
+                botMsg.innerHTML = `
+                    <div class="chat-bubble">
+                        <p style="margin-bottom: 0.75rem;">${escapeHtml(data.answer)}</p>
+                        ${sourcesHtml}
+                        ${tripletsHtml}
+                    </div>
+                `;
+            }
+
+            chatHistory.appendChild(botMsg);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
