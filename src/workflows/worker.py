@@ -121,7 +121,8 @@ def handle_download(msg: Dict[str, Any]) -> None:
     try:
         # Download audio stream to MinIO
         res = download_youtube_audio(url)
-        print(f"Ingestion Worker: Successfully downloaded {video_id} - '{res['title']}'")
+        safe_title = res['title'].encode('ascii', 'ignore').decode('ascii')
+        print(f"Ingestion Worker: Successfully downloaded {video_id} - '{safe_title}'")
         
         # Update database with details
         asyncio.run(db_update_video_status(
