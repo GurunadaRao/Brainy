@@ -24,12 +24,18 @@ class RabbitMQClient:
         channel = connection.channel()
         channel.queue_declare(queue=queue_name, durable=True)
         
+        # Inject OTel context headers
+        from opentelemetry import propagate
+        headers = {}
+        propagate.inject(headers)
+        
         channel.basic_publish(
             exchange='',
             routing_key=queue_name,
             body=json.dumps(message),
             properties=pika.BasicProperties(
-                delivery_mode=pika.DeliveryMode.Persistent
+                delivery_mode=pika.DeliveryMode.Persistent,
+                headers=headers
             )
         )
         connection.close()
@@ -46,14 +52,20 @@ class RabbitMQClient:
         channel.basic_qos(prefetch_count=1)
 
         def on_message(ch: Any, method: Any, properties: Any, body: bytes) -> None:
-            try:
-                msg_dict = json.loads(body.decode())
-                callback(msg_dict)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-            except Exception as e:
-                print(f"Error processing message from queue '{queue_name}': {e}")
-                # Reject message and requeue it
-                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+            from opentelemetry import propagate, trace
+            headers = properties.headers or {}
+            context = propagate.extract(headers)
+            
+            tracer = trace.get_tracer("rabbitmq-consumer")
+            with tracer.start_as_current_span(f"rabbitmq_consume_{queue_name}", context=context):
+                try:
+                    msg_dict = json.loads(body.decode())
+                    callback(msg_dict)
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                except Exception as e:
+                    print(f"Error processing message from queue '{queue_name}': {e}")
+                    # Reject message and requeue it
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
         channel.basic_consume(queue=queue_name, on_message_callback=on_message)
         print(f"RabbitMQ: Started consumer on queue '{queue_name}'")
