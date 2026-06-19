@@ -24,3 +24,29 @@ async def get_db_context() -> AsyncSession:
             raise
         finally:
             await session.close()
+
+
+import asyncio
+from functools import wraps
+from sqlalchemy.exc import OperationalError, InterfaceError
+
+def with_retry(max_retries: int = 3, backoff_factor: float = 0.5):
+    """Decorator to retry async database operations on connection/operational failures."""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            retries = 0
+            while True:
+                try:
+                    return await func(*args, **kwargs)
+                except (OperationalError, InterfaceError) as e:
+                    retries += 1
+                    if retries > max_retries:
+                        raise e
+                    sleep_time = backoff_factor * (2 ** (retries - 1))
+                    print(f"Database connection error: {e}. Retrying {retries}/{max_retries} in {sleep_time}s...")
+                    await asyncio.sleep(sleep_time)
+                except Exception as e:
+                    raise e
+        return wrapper
+    return decorator

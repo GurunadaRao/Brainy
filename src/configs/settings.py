@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     OLLAMA_HOST: str = "http://localhost:11434"
     EMBEDDING_MODEL: str = "nomic-embed-text"
 
+    # Security Settings
+    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000", "http://localhost:8005"]
+    RATE_LIMIT_DEFAULT: str = "60/minute"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

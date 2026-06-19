@@ -2,11 +2,12 @@ import asyncio
 from typing import List, Dict, Any
 from sqlalchemy import select
 from src.domain.models import Video, Transcription, Chunk, Triplet
-from src.infrastructure.database.session import AsyncSessionLocal
+from src.infrastructure.database.session import AsyncSessionLocal, with_retry
 from src.ingestion.chunker import semantic_chunk_text
 from src.infrastructure.ai.llm_client import llm_client
 
 
+@with_retry()
 async def process_video_extraction(video_id: str, confidence_threshold: float = 0.7) -> Dict[str, Any]:
     """
     Orchestrates the Knowledge Extraction pipeline for a transcribed video:

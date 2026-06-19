@@ -11,13 +11,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from src.configs.settings import settings
 from src.domain.models import Video, Transcription
-from src.infrastructure.database.session import AsyncSessionLocal
+from src.infrastructure.database.session import AsyncSessionLocal, with_retry
 from src.infrastructure.storage.s3_client import s3_client
 from src.infrastructure.queue.rabbitmq_client import rabbitmq_client
 from src.ingestion.downloader import download_youtube_audio
 
 
 # --- Database Helpers ---
+@with_retry()
 async def db_update_video_status(video_id: str, status: str, title: str = None, duration: int = None) -> None:
     async with AsyncSessionLocal() as session:
         async with session.begin():
@@ -35,6 +36,7 @@ async def db_update_video_status(video_id: str, status: str, title: str = None, 
                 video.duration = duration
 
 
+@with_retry()
 async def db_save_transcription(video_id: str, data: Dict[str, Any]) -> None:
     async with AsyncSessionLocal() as session:
         async with session.begin():

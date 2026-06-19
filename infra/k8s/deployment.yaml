@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brainy-backend
+  labels:
+    app: brainy-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: brainy-backend
+  template:
+    metadata:
+      labels:
+        app: brainy-backend
+    spec:
+      containers:
+      - name: backend
+        image: brainy-backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+        env:
+        - name: POSTGRES_HOST
+          value: "postgres-service"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: NEO4J_URI
+          value: "bolt://neo4j-service:7687"
+        - name: QDRANT_HOST
+          value: "qdrant-service"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: MINIO_ENDPOINT
+          value: "minio-service:9000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brainy-worker-download
+  labels:
+    app: brainy-worker-download
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: brainy-worker-download
+  template:
+    metadata:
+      labels:
+        app: brainy-worker-download
+    spec:
+      containers:
+      - name: worker
+        image: brainy-backend:latest
+        command: ["python", "src/workflows/worker.py", "download"]
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+        env:
+        - name: POSTGRES_HOST
+          value: "postgres-service"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: MINIO_ENDPOINT
+          value: "minio-service:9000"

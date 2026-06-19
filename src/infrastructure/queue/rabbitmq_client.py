@@ -16,7 +16,19 @@ class RabbitMQClient:
         )
 
     def _get_connection(self) -> pika.BlockingConnection:
-        return pika.BlockingConnection(self.connection_params)
+        import time
+        retries = 0
+        max_retries = 5
+        while True:
+            try:
+                return pika.BlockingConnection(self.connection_params)
+            except pika.exceptions.AMQPConnectionError as e:
+                retries += 1
+                if retries > max_retries:
+                    raise e
+                sleep_time = 2 ** (retries - 1)
+                print(f"RabbitMQ connection failed: {e}. Retrying {retries}/{max_retries} in {sleep_time}s...")
+                time.sleep(sleep_time)
 
     def publish(self, queue_name: str, message: dict) -> None:
         """Publish a JSON message to a queue."""
