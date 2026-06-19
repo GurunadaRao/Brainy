@@ -92,22 +92,35 @@ async def process_video_extraction(video_id: str, confidence_threshold: float = 
                     )
                     session.add(db_triplet)
                 
-                # Collect payload for Neo4j streaming
+                # Collect payload for Neo4j and Qdrant streaming
                 graph_load_payload.append({
                     "chunk_id": db_chunk.id,
                     "content": chunk_data["content"],
+                    "embedding": chunk_data["embedding"],
                     "triplets": chunk_data["triplets"]
                 })
                 
-    # 5. Load to Neo4j Graph Database
-    print("Extractor: Streaming extractions to Neo4j Graph Database...")
+    # 5. Load to Neo4j and Qdrant Databases
+    print("Extractor: Streaming extractions to Graph (Neo4j) and Vector (Qdrant) databases...")
     from src.graph.graph_loader import load_chunk_and_triplets_to_graph
+    from src.infrastructure.database.vector_client import vector_client
+    
     for payload in graph_load_payload:
+        # Load to Neo4j
         await load_chunk_and_triplets_to_graph(
             chunk_id=payload["chunk_id"],
             chunk_content=payload["content"],
             video_id=video_id,
             triplets=payload["triplets"]
+        )
+        # Load to Qdrant
+        vector_client.upsert_chunk(
+            chunk_id=payload["chunk_id"],
+            embedding=payload["embedding"],
+            payload={
+                "content": payload["content"],
+                "video_id": video_id
+            }
         )
                     
     print(f"Extractor: Knowledge extraction and graph construction complete for video {video_id}.")
