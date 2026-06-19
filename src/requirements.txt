@@ -2,7 +2,7 @@ fastapi==0.110.0
 uvicorn==0.28.0
 pydantic>=2.6.4
 pydantic-settings>=2.2.1
-sqlalchemy>=2.0.28
+sqlalchemy>=2.0.51
 asyncpg>=0.29.0
 neo4j>=5.18.0
 qdrant-client>=1.8.0
