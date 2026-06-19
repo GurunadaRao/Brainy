@@ -1,15 +1,16 @@
-import logging
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from prometheus_client import Counter, Histogram, CollectorRegistry
+from prometheus_client import CollectorRegistry, Counter, Histogram
 
 # 1. Initialize OpenTelemetry Tracer
 resource = Resource.create(attributes={"service.name": "brainy-backend"})
 provider = TracerProvider(resource=resource)
-processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://localhost:4317", insecure=True))
+processor = BatchSpanProcessor(
+    OTLPSpanExporter(endpoint="http://localhost:4317", insecure=True)
+)
 provider.add_span_processor(processor)
 trace.set_tracer_provider(provider)
 
@@ -22,16 +23,16 @@ REQUEST_COUNT = Counter(
     "brainy_requests_total",
     "Total HTTP requests count",
     ["method", "endpoint", "status"],
-    registry=registry
+    registry=registry,
 )
 
 DB_LATENCY = Histogram(
     "brainy_db_latency_seconds",
     "Database call duration in seconds",
     ["db_type", "operation"],
-    registry=registry
+    registry=registry,
 )
 
 
-def get_tracer():
+def get_tracer() -> trace.Tracer:
     return tracer

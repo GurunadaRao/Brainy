@@ -1,4 +1,5 @@
 import re
+
 from src.infrastructure.database.graph_client import graph_client
 
 
@@ -19,18 +20,15 @@ def sanitize_predicate_label(predicate: str) -> str:
     """
     cleaned = predicate.strip().upper()
     # Replace non-alphanumeric characters with underscores
-    sanitized = re.sub(r'[^A-Z0-9_]+', '_', cleaned)
+    sanitized = re.sub(r"[^A-Z0-9_]+", "_", cleaned)
     # Remove leading/trailing underscores
-    sanitized = sanitized.strip('_')
+    sanitized = sanitized.strip("_")
     # Default fallback label if empty
     return sanitized if sanitized else "RELATED_TO"
 
 
 async def load_chunk_and_triplets_to_graph(
-    chunk_id: int,
-    chunk_content: str,
-    video_id: str,
-    triplets: list
+    chunk_id: int, chunk_content: str, video_id: str, triplets: list
 ) -> None:
     """
     Performs a transaction to load a chunk and all its extracted triplets to Neo4j.
@@ -45,11 +43,14 @@ async def load_chunk_and_triplets_to_graph(
         MERGE (c:Chunk {id: $chunk_id})
         SET c.content = $chunk_content, c.video_id = $video_id, c.updated_at = timestamp()
         """
-        await session.run(chunk_query, {
-            "chunk_id": chunk_id,
-            "chunk_content": chunk_content,
-            "video_id": video_id
-        })
+        await session.run(
+            chunk_query,
+            {
+                "chunk_id": chunk_id,
+                "chunk_content": chunk_content,
+                "video_id": video_id,
+            },
+        )
 
         # 2. Merge each triplet and link to the Chunk node
         for triplet in triplets:
@@ -70,11 +71,14 @@ async def load_chunk_and_triplets_to_graph(
             ON CREATE SET r.confidence = $confidence, r.created_at = timestamp()
             ON MATCH SET r.confidence = $confidence
             """
-            await session.run(triplet_query, {
-                "chunk_id": chunk_id,
-                "subject": subject,
-                "object": obj,
-                "confidence": confidence
-            })
-            
+            await session.run(
+                triplet_query,
+                {
+                    "chunk_id": chunk_id,
+                    "subject": subject,
+                    "object": obj,
+                    "confidence": confidence,
+                },
+            )
+
     print(f"Neo4j: Loaded chunk {chunk_id} and {len(triplets)} triplets to graph.")

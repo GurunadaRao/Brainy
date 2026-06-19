@@ -1,6 +1,8 @@
 import json
+from typing import Any, Dict, List, cast
+
 import requests
-from typing import List, Dict, Any
+
 from src.configs.settings import settings
 
 
@@ -16,14 +18,12 @@ class LLMClient:
         """
         try:
             url = f"{self.ollama_url}/api/embeddings"
-            payload = {
-                "model": self.embedding_model,
-                "prompt": text
-            }
+            payload = {"model": self.embedding_model, "prompt": text}
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
             data = response.json()
-            return data["embedding"]
+            return cast(List[float], data["embedding"])
+
         except Exception as e:
             print(f"Ollama Embedding Error: {e}. Falling back to mock 768-dim vector.")
             # Return a mock 768-dimensional float vector as fallback
@@ -39,6 +39,7 @@ class LLMClient:
         if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "mock-key":
             try:
                 from openai import OpenAI
+
                 client = OpenAI(api_key=settings.OPENAI_API_KEY)
                 prompt = (
                     "Extract entities and relationships from the following text as a JSON array of triplets. "
@@ -48,18 +49,21 @@ class LLMClient:
                 res = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
                 )
                 content = res.choices[0].message.content
                 data = json.loads(content)
                 # Handle cases where LLM returns root dict like {"triplets": [...]}
                 if "triplets" in data:
-                    return data["triplets"]
+                    return cast(List[Dict[str, Any]], data["triplets"])
                 elif isinstance(data, list):
-                    return data
+                    return cast(List[Dict[str, Any]], data)
                 return []
+
             except Exception as e:
-                print(f"OpenAI Triplet Extraction failed: {e}. Trying local fallback...")
+                print(
+                    f"OpenAI Triplet Extraction failed: {e}. Trying local fallback..."
+                )
 
         # 2. Fall back to local Ollama LLM (prefer llama3.1:8b if available)
         try:
@@ -71,32 +75,49 @@ class LLMClient:
             )
             prompt = (
                 f"Identify key facts as triplets from this text:\n\n{text}\n\n"
-                "Example format: {\"triplets\": [{\"subject\": \"Alice\", \"predicate\": \"works at\", \"object\": \"Google\", \"confidence\": 0.95}]}"
+                'Example format: {"triplets": [{"subject": "Alice", "predicate": "works at", "object": "Google", "confidence": 0.95}]}'
             )
-            
+
             payload = {
                 "model": "llama3.1:8b",  # Fallback to llama3.1:8b which exists in user tags
                 "prompt": prompt,
                 "system": system_prompt,
                 "stream": False,
-                "format": "json"
+                "format": "json",
             }
             response = requests.post(url, json=payload, timeout=30)
             response.raise_for_status()
             result = response.json()
             content = result.get("response", "").strip()
             data = json.loads(content)
-            return data.get("triplets", [])
+            return cast(List[Dict[str, Any]], data.get("triplets", []))
+
         except Exception as e:
-            print(f"Local Ollama Triplet Extraction failed: {e}. Falling back to default mock triplets.")
-            
+            print(
+                f"Local Ollama Triplet Extraction failed: {e}. Falling back to default mock triplets."
+            )
+
         # 3. Final mock fallback
         return [
-            {"subject": "Brainy Platform", "predicate": "ingests", "object": "YouTube Videos", "confidence": 0.98},
-            {"subject": "YouTube Videos", "predicate": "contain", "object": "Audio Streams", "confidence": 0.95},
-            {"subject": "Whisper Engine", "predicate": "transcribes", "object": "Audio Streams", "confidence": 0.90}
+            {
+                "subject": "Brainy Platform",
+                "predicate": "ingests",
+                "object": "YouTube Videos",
+                "confidence": 0.98,
+            },
+            {
+                "subject": "YouTube Videos",
+                "predicate": "contain",
+                "object": "Audio Streams",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Whisper Engine",
+                "predicate": "transcribes",
+                "object": "Audio Streams",
+                "confidence": 0.90,
+            },
         ]
-
 
     def decompose_query(self, query: str) -> List[str]:
         """
@@ -108,24 +129,27 @@ class LLMClient:
             "or key concepts to perform a vector search. Respond strictly with a JSON object containing "
             "a single list key 'sub_queries'. Each item must be a short string query.\n\n"
             f"Query: {query}\n\n"
-            "Example response format: {\"sub_queries\": [\"What is Brainy 1.0\", \"Who published the video\"]}"
+            'Example response format: {"sub_queries": ["What is Brainy 1.0", "Who published the video"]}'
         )
 
         # 1. Try OpenAI if keys are active
         if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "mock-key":
             try:
                 from openai import OpenAI
+
                 client = OpenAI(api_key=settings.OPENAI_API_KEY)
                 res = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
                 )
                 data = json.loads(res.choices[0].message.content)
                 if "sub_queries" in data and isinstance(data["sub_queries"], list):
                     return [q.strip() for q in data["sub_queries"] if q.strip()]
             except Exception as e:
-                print(f"OpenAI Query Decomposition failed: {e}. Trying local fallback...")
+                print(
+                    f"OpenAI Query Decomposition failed: {e}. Trying local fallback..."
+                )
 
         # 2. Try Local Ollama fallback
         try:
@@ -134,7 +158,7 @@ class LLMClient:
                 "model": "llama3.1:8b",
                 "prompt": prompt,
                 "stream": False,
-                "format": "json"
+                "format": "json",
             }
             response = requests.post(url, json=payload, timeout=20)
             response.raise_for_status()
@@ -142,7 +166,9 @@ class LLMClient:
             if "sub_queries" in data and isinstance(data["sub_queries"], list):
                 return [q.strip() for q in data["sub_queries"] if q.strip()]
         except Exception as e:
-            print(f"Local Ollama Query Decomposition failed: {e}. Using simple fallback...")
+            print(
+                f"Local Ollama Query Decomposition failed: {e}. Using simple fallback..."
+            )
 
         # 3. Simple fallback (just return the original query)
         return [query]
@@ -165,29 +191,30 @@ class LLMClient:
         if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "mock-key":
             try:
                 from openai import OpenAI
+
                 client = OpenAI(api_key=settings.OPENAI_API_KEY)
                 res = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}]
+                    model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}]
                 )
-                return res.choices[0].message.content.strip()
+                content = res.choices[0].message.content
+                return cast(str, content).strip() if content else ""
+
             except Exception as e:
                 print(f"OpenAI Reasoning failed: {e}. Trying local fallback...")
 
         # 2. Fall back to local Ollama
         try:
             url = f"{self.ollama_url}/api/generate"
-            payload = {
-                "model": "llama3.1:8b",
-                "prompt": prompt,
-                "stream": False
-            }
+            payload = {"model": "llama3.1:8b", "prompt": prompt, "stream": False}
             response = requests.post(url, json=payload, timeout=30)
             response.raise_for_status()
             result = response.json()
-            return result.get("response", "").strip()
+            return cast(str, result.get("response", "")).strip()
+
         except Exception as e:
-            print(f"Local Ollama Reasoning failed: {e}. Falling back to default mock answer.")
+            print(
+                f"Local Ollama Reasoning failed: {e}. Falling back to default mock answer."
+            )
 
         # 3. Final mock fallback
         return (

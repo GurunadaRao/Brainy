@@ -1,7 +1,8 @@
-from typing import List, Dict, Any
+from typing import Any, Dict
+
 from src.infrastructure.ai.llm_client import llm_client
-from src.infrastructure.database.vector_client import vector_client
 from src.infrastructure.database.graph_client import graph_client
+from src.infrastructure.database.vector_client import vector_client
 
 
 class HybridRetriever:
@@ -14,7 +15,7 @@ class HybridRetriever:
         """
         # 1. Decompose query
         sub_queries = llm_client.decompose_query(query)
-        
+
         # 2. Vector search in Qdrant for each sub-query
         vector_results_map = {}
         for sq in sub_queries:
@@ -25,17 +26,11 @@ class HybridRetriever:
 
         # Sort combined results by score and slice to top_k
         vector_results = sorted(
-            vector_results_map.values(),
-            key=lambda x: x["score"],
-            reverse=True
+            vector_results_map.values(), key=lambda x: x["score"], reverse=True
         )[:top_k]
 
         if not vector_results:
-            return {
-                "chunks": [],
-                "entities": [],
-                "relationships": []
-            }
+            return {"chunks": [], "entities": [], "relationships": []}
 
         # 3. Extract matching chunk IDs
         chunk_ids = [res["chunk_id"] for res in vector_results]
@@ -52,25 +47,25 @@ class HybridRetriever:
         MATCH (e)-[r1:!MENTIONS]->(other1:Entity)-[r2:!MENTIONS]->(other2:Entity)
         RETURN c.id as chunk_id, other1.name as subject, type(r2) as predicate, other2.name as object
         """
-        
+
         graph_results = await graph_client.run_query(cypher, {"chunk_ids": chunk_ids})
 
         # 5. Format and deduplicate Graph results
         entities = set()
         relationships = []
-        
+
         for record in graph_results:
             if record["subject"]:
                 entities.add(record["subject"])
             if record["object"]:
                 entities.add(record["object"])
-                
+
             # Only add relationship if it exists
             if record["predicate"] and record["object"]:
                 rel = {
                     "subject": record["subject"],
                     "predicate": record["predicate"],
-                    "object": record["object"]
+                    "object": record["object"],
                 }
                 if rel not in relationships:
                     relationships.append(rel)
@@ -78,7 +73,7 @@ class HybridRetriever:
         return {
             "chunks": vector_results,
             "entities": list(entities),
-            "relationships": relationships
+            "relationships": relationships,
         }
 
 

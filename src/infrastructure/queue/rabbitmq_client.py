@@ -1,22 +1,27 @@
 import json
-from typing import Callable, Any
+from typing import Any, Callable
+
 import pika
+
 from src.configs.settings import settings
 
 
 class RabbitMQClient:
     def __init__(self) -> None:
-        self.credentials = pika.PlainCredentials(settings.RABBITMQ_USER, settings.RABBITMQ_PASSWORD)
+        self.credentials = pika.PlainCredentials(
+            settings.RABBITMQ_USER, settings.RABBITMQ_PASSWORD
+        )
         self.connection_params = pika.ConnectionParameters(
             host=settings.RABBITMQ_HOST,
             port=settings.RABBITMQ_PORT,
             credentials=self.credentials,
             heartbeat=600,
-            blocked_connection_timeout=300
+            blocked_connection_timeout=300,
         )
 
     def _get_connection(self) -> pika.BlockingConnection:
         import time
+
         retries = 0
         max_retries = 5
         while True:
@@ -27,7 +32,9 @@ class RabbitMQClient:
                 if retries > max_retries:
                     raise e
                 sleep_time = 2 ** (retries - 1)
-                print(f"RabbitMQ connection failed: {e}. Retrying {retries}/{max_retries} in {sleep_time}s...")
+                print(
+                    f"RabbitMQ connection failed: {e}. Retrying {retries}/{max_retries} in {sleep_time}s..."
+                )
                 time.sleep(sleep_time)
 
     def publish(self, queue_name: str, message: dict) -> None:
@@ -35,26 +42,26 @@ class RabbitMQClient:
         connection = self._get_connection()
         channel = connection.channel()
         channel.queue_declare(queue=queue_name, durable=True)
-        
+
         # Inject OTel context headers
         from opentelemetry import propagate
-        headers = {}
+
+        headers: dict[str, Any] = {}
         propagate.inject(headers)
-        
+
         channel.basic_publish(
-            exchange='',
+            exchange="",
             routing_key=queue_name,
             body=json.dumps(message),
             properties=pika.BasicProperties(
-                delivery_mode=pika.DeliveryMode.Persistent,
-                headers=headers
-            )
+                delivery_mode=pika.DeliveryMode.Persistent, headers=headers
+            ),
         )
         connection.close()
 
     def start_consumer(self, queue_name: str, callback: Callable[[dict], None]) -> None:
         """
-        Start consuming messages from a queue. 
+        Start consuming messages from a queue.
         Runs blocking loop in the calling thread.
         """
         connection = self._get_connection()
@@ -65,11 +72,14 @@ class RabbitMQClient:
 
         def on_message(ch: Any, method: Any, properties: Any, body: bytes) -> None:
             from opentelemetry import propagate, trace
+
             headers = properties.headers or {}
             context = propagate.extract(headers)
-            
+
             tracer = trace.get_tracer("rabbitmq-consumer")
-            with tracer.start_as_current_span(f"rabbitmq_consume_{queue_name}", context=context):
+            with tracer.start_as_current_span(
+                f"rabbitmq_consume_{queue_name}", context=context
+            ):
                 try:
                     msg_dict = json.loads(body.decode())
                     callback(msg_dict)

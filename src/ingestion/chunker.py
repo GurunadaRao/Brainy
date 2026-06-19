@@ -1,6 +1,7 @@
 import math
 import re
 from typing import List
+
 from src.infrastructure.ai.llm_client import llm_client
 
 
@@ -17,11 +18,16 @@ def cosine_similarity(v1: List[float], v2: List[float]) -> float:
 def split_sentences(text: str) -> List[str]:
     """Splits a body of text into sentences using simple regex."""
     # Split on periods, exclamation marks, or question marks followed by spaces
-    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = re.split(r"(?<=[.!?])\s+", text)
     return [s.strip() for s in sentences if s.strip()]
 
 
-def semantic_chunk_text(text: str, min_words: int = 50, max_words: int = 250, similarity_threshold: float = 0.6) -> List[str]:
+def semantic_chunk_text(
+    text: str,
+    min_words: int = 50,
+    max_words: int = 250,
+    similarity_threshold: float = 0.6,
+) -> List[str]:
     """
     Groups sentences into chunks. Starts a new chunk if the cosine similarity
     between adjacent sentence embeddings falls below `similarity_threshold`.
@@ -33,7 +39,7 @@ def semantic_chunk_text(text: str, min_words: int = 50, max_words: int = 250, si
 
     # Get embeddings for each sentence
     embeddings = [llm_client.get_embedding(s) for s in sentences]
-    
+
     chunks = []
     current_chunk_sentences = [sentences[0]]
     current_chunk_words = len(sentences[0].split())
@@ -41,15 +47,15 @@ def semantic_chunk_text(text: str, min_words: int = 50, max_words: int = 250, si
     for i in range(1, len(sentences)):
         sentence = sentences[i]
         words_count = len(sentence.split())
-        
+
         # Calculate similarity with the previous sentence
-        sim = cosine_similarity(embeddings[i-1], embeddings[i])
-        
+        sim = cosine_similarity(embeddings[i - 1], embeddings[i])
+
         # Determine whether to split
         reached_max = (current_chunk_words + words_count) > max_words
         is_semantic_shift = sim < similarity_threshold
         has_min_words = current_chunk_words >= min_words
-        
+
         if (is_semantic_shift and has_min_words) or reached_max:
             # Emit current chunk
             chunks.append(" ".join(current_chunk_sentences))

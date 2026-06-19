@@ -1,8 +1,9 @@
 import io
-import os
 from typing import BinaryIO
+
 from minio import Minio
 from minio.error import S3Error
+
 from src.configs.settings import settings
 
 
@@ -31,9 +32,13 @@ class S3Client:
         try:
             self.client.fput_object(bucket_name, object_name, file_path)
         except S3Error as e:
-            raise RuntimeError(f"Failed to upload {file_path} to {bucket_name}/{object_name}: {e}")
+            raise RuntimeError(
+                f"Failed to upload {file_path} to {bucket_name}/{object_name}: {e}"
+            )
 
-    def upload_stream(self, bucket_name: str, object_name: str, data: BinaryIO, length: int) -> None:
+    def upload_stream(
+        self, bucket_name: str, object_name: str, data: BinaryIO, length: int
+    ) -> None:
         """Upload a binary stream to a bucket."""
         try:
             self.client.put_object(
@@ -41,17 +46,21 @@ class S3Client:
                 object_name,
                 data,
                 length,
-                content_type="application/octet-stream"
+                content_type="application/octet-stream",
             )
         except S3Error as e:
-            raise RuntimeError(f"Failed to upload stream to {bucket_name}/{object_name}: {e}")
+            raise RuntimeError(
+                f"Failed to upload stream to {bucket_name}/{object_name}: {e}"
+            )
 
     def download_file(self, bucket_name: str, object_name: str, file_path: str) -> None:
         """Download a file from a bucket to local disk."""
         try:
             self.client.fget_object(bucket_name, object_name, file_path)
         except S3Error as e:
-            raise RuntimeError(f"Failed to download {bucket_name}/{object_name} to {file_path}: {e}")
+            raise RuntimeError(
+                f"Failed to download {bucket_name}/{object_name} to {file_path}: {e}"
+            )
 
     def get_object(self, bucket_name: str, object_name: str) -> io.BytesIO:
         """Fetch an object directly into memory as a BytesIO stream."""
