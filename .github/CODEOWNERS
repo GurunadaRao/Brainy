@@ -1,0 +1,9 @@
+# CODEOWNERS for Brainy 1.0
+# Matches paths to specific code owner roles
+
+*                   @gurunath-dev
+/src/ai/            @gurunath-dev @ai-engineer-agent
+/src/graph/         @gurunath-dev @kg-engineer-agent
+/src/ingestion/     @gurunath-dev @ingestion-agent
+/infra/             @gurunath-dev @devops-engineer-agent
+/.github/           @gurunath-dev @devops-engineer-agent

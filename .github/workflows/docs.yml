@@ -1,0 +1,23 @@
+name: Docs Validation
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - '.ai/**'
+      - '*.md'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.ai/**'
+      - '*.md'
+
+jobs:
+  markdown-link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Markdown Link Checker
+        uses: tcort/markdown-link-check@v3.11.2
+        with:
+          config-file: '.github/mlc_config.json'
