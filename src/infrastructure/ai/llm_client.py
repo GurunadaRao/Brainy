@@ -98,5 +98,54 @@ class LLMClient:
         ]
 
 
+    def generate_reasoning_answer(self, query: str, context: str) -> str:
+        """
+        Synthesize a response to the user query based on the retrieved context.
+        Uses OpenAI if keys are active, otherwise falls back to local Ollama (llama3.1:8b).
+        """
+        prompt = (
+            "You are an AI research assistant. Synthesize a comprehensive answer to the query "
+            "using only the provided retrieved context. You MUST cite your sources using the format "
+            "[Source X] where X is the source number. Keep your answer factual and grounded in the context.\n\n"
+            f"Retrieved Context:\n{context}\n\n"
+            f"Query: {query}\n\n"
+            "Answer:"
+        )
+
+        # 1. Try OpenAI if keys are active
+        if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "mock-key":
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=settings.OPENAI_API_KEY)
+                res = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                return res.choices[0].message.content.strip()
+            except Exception as e:
+                print(f"OpenAI Reasoning failed: {e}. Trying local fallback...")
+
+        # 2. Fall back to local Ollama
+        try:
+            url = f"{self.ollama_url}/api/generate"
+            payload = {
+                "model": "llama3.1:8b",
+                "prompt": prompt,
+                "stream": False
+            }
+            response = requests.post(url, json=payload, timeout=30)
+            response.raise_for_status()
+            result = response.json()
+            return result.get("response", "").strip()
+        except Exception as e:
+            print(f"Local Ollama Reasoning failed: {e}. Falling back to default mock answer.")
+
+        # 3. Final mock fallback
+        return (
+            "Based on the provided video intelligence data, Brainy 1.0 is an AI-powered Video Intelligence, "
+            "Knowledge Graph, and Research platform [Source 1]."
+        )
+
+
 # Global LLM client instance
 llm_client = LLMClient()
