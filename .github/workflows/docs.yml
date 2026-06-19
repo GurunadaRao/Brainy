@@ -18,6 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Markdown Link Checker
-        uses: tcort/markdown-link-check@v3.11.2
+        uses: tcort/markdown-link-check@v3.14.2
         with:
           config-file: '.github/mlc_config.json'
