@@ -19,6 +19,9 @@ class Video(Base):
     transcriptions: Mapped[List["Transcription"]] = relationship(
         "Transcription", back_populates="video", cascade="all, delete-orphan"
     )
+    chunks: Mapped[List["Chunk"]] = relationship(
+        "Chunk", back_populates="video", cascade="all, delete-orphan"
+    )
 
 
 class Transcription(Base):
@@ -33,3 +36,35 @@ class Transcription(Base):
 
     # Relationships
     video: Mapped["Video"] = relationship("Video", back_populates="transcriptions")
+
+
+class Chunk(Base):
+    __tablename__ = "chunks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    video_id: Mapped[str] = mapped_column(String(50), ForeignKey("videos.id"), nullable=False)
+    content: Mapped[str] = mapped_column(String, nullable=False)
+    embedding: Mapped[List[float]] = mapped_column(JSON, nullable=False)  # Stored as JSON float array for portability
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    video: Mapped["Video"] = relationship("Video", back_populates="chunks")
+    triplets: Mapped[List["Triplet"]] = relationship(
+        "Triplet", back_populates="chunk", cascade="all, delete-orphan"
+    )
+
+
+class Triplet(Base):
+    __tablename__ = "triplets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chunk_id: Mapped[int] = mapped_column(Integer, ForeignKey("chunks.id"), nullable=False)
+    subject: Mapped[str] = mapped_column(String(128), nullable=False)
+    predicate: Mapped[str] = mapped_column(String(128), nullable=False)
+    object: Mapped[str] = mapped_column(String(128), nullable=False)
+    confidence: Mapped[float] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    chunk: Mapped["Chunk"] = relationship("Chunk", back_populates="triplets")
+

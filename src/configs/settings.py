@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     # LLM & AI Settings
     OPENAI_API_KEY: str = "mock-key"
     GEMINI_API_KEY: str = "mock-key"
+    OLLAMA_HOST: str = "http://localhost:11434"
+    EMBEDDING_MODEL: str = "nomic-embed-text"
 
     model_config = SettingsConfigDict(
         env_file=".env",
