@@ -62,6 +62,7 @@ async def process_video_extraction(video_id: str, confidence_threshold: float = 
         })
 
     # 4. Save to Database
+    graph_load_payload = []
     async with AsyncSessionLocal() as session:
         async with session.begin():
             # Clean up old extractions if any exist to prevent duplicates
@@ -90,8 +91,26 @@ async def process_video_extraction(video_id: str, confidence_threshold: float = 
                         confidence=trip_data["confidence"]
                     )
                     session.add(db_triplet)
+                
+                # Collect payload for Neo4j streaming
+                graph_load_payload.append({
+                    "chunk_id": db_chunk.id,
+                    "content": chunk_data["content"],
+                    "triplets": chunk_data["triplets"]
+                })
+                
+    # 5. Load to Neo4j Graph Database
+    print("Extractor: Streaming extractions to Neo4j Graph Database...")
+    from src.graph.graph_loader import load_chunk_and_triplets_to_graph
+    for payload in graph_load_payload:
+        await load_chunk_and_triplets_to_graph(
+            chunk_id=payload["chunk_id"],
+            chunk_content=payload["content"],
+            video_id=video_id,
+            triplets=payload["triplets"]
+        )
                     
-    print(f"Extractor: Knowledge extraction complete for video {video_id}.")
+    print(f"Extractor: Knowledge extraction and graph construction complete for video {video_id}.")
     return {
         "video_id": video_id,
         "chunks_count": len(extracted_data),
